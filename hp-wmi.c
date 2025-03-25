@@ -212,10 +212,10 @@ static DEFINE_MUTEX(active_platform_profile_lock);
 static struct input_dev *hp_wmi_input_dev;
 static struct input_dev *camera_shutter_input_dev;
 static struct platform_device *hp_wmi_platform_dev;
-static struct device *platform_profile_device;
-static struct notifier_block platform_power_source_nb;
-static enum platform_profile_option active_platform_profile;
-static bool platform_profile_support;
+// static struct device *platform_profile_device;
+// static struct notifier_block platform_power_source_nb;
+// static enum platform_profile_option active_platform_profile;
+// static bool platform_profile_support;
 static bool zero_insize_support;
 
 static struct rfkill *wifi_rfkill;
@@ -851,8 +851,10 @@ static DEVICE_ATTR_RW(als);
 static DEVICE_ATTR_RO(dock);
 static DEVICE_ATTR_RO(tablet);
 static DEVICE_ATTR_RW(postcode);
+static DEVICE_ATTR_RW(backlight);
 
 static struct attribute *hp_wmi_attrs[] = {
+	&dev_attr_backlight.attr,
 	&dev_attr_display.attr,
 	&dev_attr_hddtemp.attr,
 	&dev_attr_als.attr,
@@ -1945,7 +1947,7 @@ static int __init hp_wmi_bios_setup(struct platform_device *device)
 	if (err < 0)
 		return err;
 
-	thermal_profile_setup(device);
+	// thermal_profile_setup(device);
 
 	return 0;
 }
