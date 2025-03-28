@@ -742,13 +742,17 @@ static int hp_wmi_rfkill2_refresh(void)
 }
 static ssize_t fancount_show(struct device *dev, struct device_attribute *attr, char *buf)
 {
-    int value = hp_wmi_get_fan_count();
+    int ret = hp_wmi_get_fan_count();
+	if(ret < 0)
+		return -EINVAL;
 	return sysfs_emit(buf, "%d\n", value);
 }
 
 static ssize_t backlight_show(struct device *dev, struct device_attribute *attr, char *buf)
 {
-    int value = hp_wmi_get_backlight();
+    int ret = hp_wmi_get_backlight();
+	if(ret < 0)
+		return -EINVAL;
 	return sysfs_emit(buf, "%d\n", value);
 }
 
@@ -868,6 +872,19 @@ static ssize_t postcode_store(struct device *dev, struct device_attribute *attr,
 	return count;
 }
 
+static ssize_t fancount_store(struct device *dev, struct device_attribute *attr,
+	const char *buf, size_t count)
+{
+	int ret;
+
+	ret = kstrtobool(buf, &clear);
+	if (!ret)
+		return ret;
+	
+	hp_wmi_get_fan_count();
+	return ret;
+}
+
 static int camera_shutter_input_setup(void)
 {
 	int err;
@@ -902,7 +919,7 @@ static DEVICE_ATTR_RO(dock);
 static DEVICE_ATTR_RO(tablet);
 static DEVICE_ATTR_RW(postcode);
 static DEVICE_ATTR_RW(backlight);
-static DEVICE_ATTR_RO(fancount);
+static DEVICE_ATTR_RW(fancount);
 
 static struct attribute *hp_wmi_attrs[] = {
 	&dev_attr_backlight.attr,
