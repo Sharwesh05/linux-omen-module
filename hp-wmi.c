@@ -482,10 +482,10 @@ static int hp_wmi_fan_speed_max_reset(void)
 	return ret;
 }
 
-static int hp_wmi_set_backlight(int enabled)
+static int hp_wmi_set_backlight(enum backlight enabled)
 {
 	int ret;
-	u8 data[4]={(enabled==1)?BACKLIGHT_ON:BACKLIGHT_OFF,0,0,0};
+	u8 data[4]={(enabled,0,0,0};
 
 	ret = hp_wmi_perform_query(HPWMI_SET_BACKLIGHT,HPWMI_GM_v2,
 				   &data, sizeof(data), 0);
@@ -1536,7 +1536,7 @@ static int thermal_profile_setup(struct platform_device *device)
 		if (err < 0)
 			return err;
 
-		ops = &platform_profile_victus_s_ops;
+		ops = &platform_profile_omen_v1_ops;
 	} 
 	platform_profile_device = devm_platform_profile_register(&device->dev, "hp-wmi",
 								 NULL, ops);
@@ -1821,8 +1821,6 @@ module_init(hp_wmi_init);
 
 static void __exit hp_wmi_exit(void)
 {
-	// if (is_omen_thermal_profile() || is_victus_thermal_profile())
-	// 	omen_unregister_powersource_event_handler();
 	if (is_omen_v1_thermal_profile()) 
 		omen_v1_unregister_powersource_event_handler();
 
