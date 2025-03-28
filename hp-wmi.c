@@ -740,6 +740,12 @@ static int hp_wmi_rfkill2_refresh(void)
 
 	return 0;
 }
+static ssize_t fancount_show(struct device *dev, struct device_attribute *attr, char *buf)
+{
+    int value = hp_wmi_get_fan_count();
+	return sysfs_emit(buf, "%d\n", value);
+}
+
 static ssize_t backlight_show(struct device *dev, struct device_attribute *attr, char *buf)
 {
     int value = hp_wmi_get_backlight();
@@ -896,9 +902,11 @@ static DEVICE_ATTR_RO(dock);
 static DEVICE_ATTR_RO(tablet);
 static DEVICE_ATTR_RW(postcode);
 static DEVICE_ATTR_RW(backlight);
+static DEVICE_ATTR_RO(fancount);
 
 static struct attribute *hp_wmi_attrs[] = {
 	&dev_attr_backlight.attr,
+	&dev_attr_fancount.attr,
 	&dev_attr_display.attr,
 	&dev_attr_hddtemp.attr,
 	&dev_attr_als.attr,
