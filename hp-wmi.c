@@ -1478,7 +1478,7 @@ static int omen_v1_powersource_event(struct notifier_block *nb,
 	 * needs manual triggering of CPU power limits. Same goes when switching
 	 * to AC power source while Performance mode is active. Other modes
 	 * however are automatically behaving without any manual action.
-	 * Seen on HP 16-s1034nf (board 8C9C) with F.11 and F.13 BIOS versions.
+	 * Seen on OMEN v1 Boards.
 	 */
 
 	if (active_platform_profile == PLATFORM_PROFILE_PERFORMANCE) {
@@ -1576,7 +1576,7 @@ static int __init hp_wmi_bios_setup(struct platform_device *device)
 	if (err < 0)
 		return err;
 
-	// thermal_profile_setup(device);
+	thermal_profile_setup(device);
 
 	return 0;
 }
