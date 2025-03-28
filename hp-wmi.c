@@ -485,7 +485,7 @@ static int hp_wmi_fan_speed_max_reset(void)
 static int hp_wmi_set_backlight(enum backlight enabled)
 {
 	int ret;
-	u8 data[4]={(enabled,0,0,0};
+	u8 data[4]={enabled,0,0,0};
 
 	ret = hp_wmi_perform_query(HPWMI_SET_BACKLIGHT,HPWMI_GM_v2,
 				   &data, sizeof(data), 0);
@@ -583,8 +583,8 @@ static bool is_omen_thermal_profile(void)
 	if (!board_name)
 		return false;
 
-	return match_string(thermal_profile__v1_boards,
-			    ARRAY_SIZE(thermal_profile__v1_boards),
+	return match_string(thermal_profile_v1_boards,
+			    ARRAY_SIZE(thermal_profile_v1_boards),
 			    board_name) >= 0;
 }
 
@@ -596,8 +596,8 @@ static int omen_get_thermal_policy_version(void)
 	const char *board_name = dmi_get_system_info(DMI_BOARD_NAME);
 
 	if (board_name) {
-		int matches = match_string(thermal_profile__v1_boards,
-			ARRAY_SIZE(thermal_profile__v1_boards),
+		int matches = match_string(thermal_profile_v1_boards,
+			ARRAY_SIZE(thermal_profile_v1_boards),
 			board_name);
 		if (matches >= 0)
 			return 0;
@@ -1374,7 +1374,7 @@ static int omen_v1_set_cpu_pl1_pl2(u8 pl1, u8 pl2)
 	power_limits.pl4 = HP_POWER_LIMIT_NO_CHANGE;
 	power_limits.cpu_gpu_concurrent_limit = HP_POWER_LIMIT_NO_CHANGE;
 
-	ret = hp_wmi_perform_query(HPWMI_SET_POWER_LIMITS_QUERY, HPWMI_GM,
+	ret = hp_wmi_perform_query(HPWMI_CPU_POWER_SET_QUERY, HPWMI_GM,
 				   &power_limits, sizeof(power_limits), 0);
 
 	return ret;
@@ -1384,7 +1384,7 @@ static int platform_profile_omen_v1_set_ec(enum platform_profile_option profile)
 {
 	bool gpu_ctgp_enable, gpu_ppab_enable;
 	u8 gpu_dstate; /* Test shows 1 = 100%, 2 = 50%, 3 = 25%, 4 = 12.5% */
-	int err, 
+	int err;
 	enum hp_fan_mode tp;
 
 	switch (profile) {
@@ -1522,7 +1522,7 @@ static const struct platform_profile_ops platform_profile_omen_v1_ops = {
 static int thermal_profile_setup(struct platform_device *device)
 {
 	const struct platform_profile_ops *ops;
-	int err, tp;
+	int err;
 	if (is_omen_v1_thermal_profile()) {
 
 		/*
