@@ -819,12 +819,12 @@ static ssize_t postcode_show(struct device *dev, struct device_attribute *attr,
 }
 
 static ssize_t backlight_store(struct device *dev, struct device_attribute *attr,
-	const char *buf, size_t count){
+	const char *buf, size_t count)
+{	
+	hp_wmi_get_fan_count();
 	if (buf[0]=='0'){
-		hp_wmi_get_fan_count();
 		hp_wmi_set_backlight(BACKLIGHT_OFF);
 	}else if(buf[0]=='1'){
-		hp_wmi_get_fan_count();
 		hp_wmi_set_backlight(BACKLIGHT_ON);
 	}
 	else
@@ -1423,8 +1423,6 @@ static int platform_profile_omen_v1_set_ec(enum platform_profile_option profile)
 		return -EOPNOTSUPP;
 	}
 
-	hp_wmi_get_fan_count();
-
 	err = omen_thermal_profile_set(tp);
 	if (err < 0) {
 		pr_err("Failed to set platform profile %d: %d\n", profile, err);
@@ -1700,7 +1698,6 @@ static int hp_wmi_hwmon_read(struct device *dev, enum hwmon_sensor_types type,
 	switch (type) {
 	case hwmon_fan:
 		ret = hp_wmi_get_fan_speed(channel);
-
 		if (ret < 0)
 			return ret;
 		*val = ret;
@@ -1729,16 +1726,15 @@ static int hp_wmi_hwmon_read(struct device *dev, enum hwmon_sensor_types type,
 static int hp_wmi_hwmon_write(struct device *dev, enum hwmon_sensor_types type,
 			      u32 attr, int channel, long val)
 {
+	hp_wmi_get_fan_count();
 	switch (type) {
 	case hwmon_pwm:
 		switch (val) {
 		case 0:
 			/* 0 is no fan speed control (max), which is 1 for us */
-			hp_wmi_get_fan_count();
 			return hp_wmi_fan_speed_max_set(1);
 		case 2:
 			/* 2 is automatic speed control, which is 0 for us */
-			hp_wmi_get_fan_count();
 			return hp_wmi_fan_speed_max_reset();
 		default:
 			/* we don't support manual fan speed control */
