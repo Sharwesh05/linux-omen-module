@@ -745,7 +745,8 @@ static ssize_t fancount_show(struct device *dev, struct device_attribute *attr, 
     int ret = hp_wmi_get_fan_count();
 	if(ret < 0)
 		return -EINVAL;
-	return sysfs_emit(buf, "%d\n", value);
+	printk("Bios-control off(120s)\n");
+	return sysfs_emit(buf, "%d\n", ret);
 }
 
 static ssize_t backlight_show(struct device *dev, struct device_attribute *attr, char *buf)
@@ -753,7 +754,7 @@ static ssize_t backlight_show(struct device *dev, struct device_attribute *attr,
     int ret = hp_wmi_get_backlight();
 	if(ret < 0)
 		return -EINVAL;
-	return sysfs_emit(buf, "%d\n", value);
+	return sysfs_emit(buf, "%d\n", ret);
 }
 
 static ssize_t display_show(struct device *dev, struct device_attribute *attr,
@@ -876,12 +877,11 @@ static ssize_t fancount_store(struct device *dev, struct device_attribute *attr,
 	const char *buf, size_t count)
 {
 	int ret;
+	if (buf[0]=='0')
+		return 0;
 
-	ret = kstrtobool(buf, &clear);
-	if (!ret)
-		return ret;
-	
-	hp_wmi_get_fan_count();
+	ret = hp_wmi_get_fan_count();
+	printk("Bios-control off(120s)\n");
 	return ret;
 }
 
