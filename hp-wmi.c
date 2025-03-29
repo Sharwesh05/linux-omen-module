@@ -413,6 +413,7 @@ static int hp_wmi_get_fan_count(void)
 	if (ret != 0)
 		return -EINVAL;
 
+	printk("Bios-control off(120s)\n");
 	return fan_data[0]; /* BIOS_PROTECTION-{0},OCP-{1},OTP-{2} */
 }
 
@@ -431,6 +432,17 @@ static int hp_wmi_get_fan_speed(int fan)
 		return -EINVAL;
 
 	return fan_data[fan] * 100;
+}
+
+static int hp_wmi_set_fan_speed(char cpu,char gpu)
+{
+	u8 fan_speed[2] = { cpu, gpu };
+	int ret;
+
+	ret = hp_wmi_perform_query(HPWMI_FAN_SPEED_SET_QUERY, HPWMI_GM,
+				   &fan_speed, sizeof(fan_speed), 0);
+
+	return ret;
 }
 
 static int hp_wmi_fan_speed_max_set(int enabled)
@@ -459,17 +471,6 @@ static int hp_wmi_fan_speed_max_get(void)
 	return val;
 }
 
-static int hp_wmi_set_fan_speed(char cpu,char gpu)
-{
-	u8 fan_speed[2] = { cpu, gpu };
-	int ret;
-
-	ret = hp_wmi_perform_query(HPWMI_FAN_SPEED_SET_QUERY, HPWMI_GM,
-				   &fan_speed, sizeof(fan_speed), 0);
-
-	return ret;
-}
-
 static int hp_wmi_fan_speed_max_reset(void)
 {
 	int ret;
@@ -480,6 +481,19 @@ static int hp_wmi_fan_speed_max_reset(void)
 
 	ret = hp_wmi_set_fan_speed(0x00,0x00);
 	return ret;
+}
+
+static int hp_wmi_get_backlight(void)
+{
+	int ret;
+	u8 data[4]={};
+
+	ret = hp_wmi_perform_query(HPWMI_GET_BACKLIGHT,HPWMI_GM_v2,
+				   &data, sizeof(u8),sizeof(data));
+
+	if (ret)
+		return ret < 0 ? ret : -EINVAL;
+	return (data[0]==0x00)?0:1;
 }
 
 static int hp_wmi_set_backlight(enum backlight enabled)
@@ -494,19 +508,6 @@ static int hp_wmi_set_backlight(enum backlight enabled)
 		return ret < 0 ? ret : -EINVAL;
 
 	return 1;
-}
-
-static int hp_wmi_get_backlight(void)
-{
-	int ret;
-	u8 data[4]={};
-
-	ret = hp_wmi_perform_query(HPWMI_GET_BACKLIGHT,HPWMI_GM_v2,
-				   &data, sizeof(u8),sizeof(data));
-
-	if (ret)
-		return ret < 0 ? ret : -EINVAL;
-	return (data[0]==0x00)?0:1;
 }
 
 static int hp_wmi_read_int(int query)
@@ -574,18 +575,6 @@ static int omen_thermal_profile_set(enum hp_fan_mode mode)
 		return ret < 0 ? ret : -EINVAL;
 
 	return mode;
-}
-
-static bool is_omen_thermal_profile(void)
-{
-	const char *board_name = dmi_get_system_info(DMI_BOARD_NAME);
-
-	if (!board_name)
-		return false;
-
-	return match_string(thermal_profile_v1_boards,
-			    ARRAY_SIZE(thermal_profile_v1_boards),
-			    board_name) >= 0;
 }
 
 static int omen_get_thermal_policy_version(void)
@@ -745,7 +734,6 @@ static ssize_t fancount_show(struct device *dev, struct device_attribute *attr, 
     int ret = hp_wmi_get_fan_count();
 	if(ret < 0)
 		return -EINVAL;
-	printk("Bios-control off(120s)\n");
 	return sysfs_emit(buf, "%d\n", ret);
 }
 
@@ -819,7 +807,7 @@ static ssize_t postcode_show(struct device *dev, struct device_attribute *attr,
 }
 
 static ssize_t backlight_store(struct device *dev, struct device_attribute *attr,
-	const char *buf, size_t count)
+				const char *buf, size_t count)
 {	
 	hp_wmi_get_fan_count();
 	if (buf[0]=='0'){
