@@ -873,18 +873,6 @@ static ssize_t postcode_store(struct device *dev, struct device_attribute *attr,
 	return count;
 }
 
-static ssize_t fancount_store(struct device *dev, struct device_attribute *attr,
-	const char *buf, size_t count)
-{
-	int ret;
-	if (buf[0]=='0')
-		return 0;
-
-	ret = hp_wmi_get_fan_count();
-	printk("Bios-control off(120s)\n");
-	return ret;
-}
-
 static int camera_shutter_input_setup(void)
 {
 	int err;
@@ -919,7 +907,7 @@ static DEVICE_ATTR_RO(dock);
 static DEVICE_ATTR_RO(tablet);
 static DEVICE_ATTR_RW(postcode);
 static DEVICE_ATTR_RW(backlight);
-static DEVICE_ATTR_RW(fancount);
+static DEVICE_ATTR_RO(fancount);
 
 static struct attribute *hp_wmi_attrs[] = {
 	&dev_attr_backlight.attr,
