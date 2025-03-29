@@ -1,0 +1,2 @@
+#!/bin/bash
+cat /sys/devices/platform/hp-wmi/fancount > /dev/null

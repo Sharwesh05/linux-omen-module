@@ -1,0 +1,11 @@
+[Unit]
+Description=Run Omenhsa Client Service every 1 minute 15 seconds after boot
+Requires=Omenhsaclient.service
+
+[Timer]
+Unit=Omenhsaclient.service
+OnUnitInactiveSec=110s
+AccuracySec=3s
+
+[Install]
+WantedBy=timers.target
