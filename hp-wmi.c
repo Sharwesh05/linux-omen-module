@@ -65,12 +65,9 @@ enum hp_fan_mode { //Performance Mode
     FANMODE_L5                 =  0x11, // 0b00010001
     FANMODE_L1                 =  0x20, // 0b00100000
     FANMODE_L6                 =  0x21, // 0b00100001
-    FANMODE_DEFAULT            =  0x30, // 0b00110000
     FANMODE_L2                 =  0x30, // 0b00110000
-    FANMODE_PERFORMANCE        =  0x31, // 0b00110001
     FANMODE_L7                 =  0x31, // 0b00110001
     FANMODE_L3                 =  0x40, // 0b01000000
-    FANMODE_COOL               =  0x50, // 0b01010000
     FANMODE_L4                 =  0x50  // 0b01010000
 };
 enum hp_gpu_mode{
@@ -173,7 +170,7 @@ enum hp_wmi_command {
 	HPWMI_WRITE	= 0x02, // Graphics mode switch (2)
 	HPWMI_ODM	= 0x03,
 	HPWMI_GM	= 0x20008, // Most commands (131080)
-	HPWMI_GM_v2 = 0X20009, //Current Implementa	tion
+	HPWMI_GM_v2 = 0X20009, //Current Implementation(going on)
 };
 
 enum backlight {
@@ -601,18 +598,6 @@ static int omen_get_thermal_policy_version(void)
 	return buffer[3];
 }
 
-static int omen_thermal_profile_get(void)
-{
-	u8 data;
-
-	int ret = ec_read(HP_OMEN_EC_THERMAL_PROFILE_OFFSET, &data);
-
-	if (ret)
-		return ret;
-
-	return data;
-}
-
 static int __init hp_wmi_bios_2008_later(void)
 {
 	int state = 0;
@@ -729,6 +714,21 @@ static int hp_wmi_rfkill2_refresh(void)
 
 	return 0;
 }
+
+static ssize_t systemdesign_show(struct device *dev, struct device_attribute *attr, char *buf)
+{
+    int ret;
+	unsigned char buffer[8] = {0x00};
+
+	ret = hp_wmi_perform_query(HPWMI_GET_SYSTEM_DESIGN_DATA, HPWMI_GM, &buffer ,sizeof(buffer), sizeof(buffer));
+	if(ret < 0)
+		return -EINVAL;
+	
+	return sysfs_emit(buf, "%02X %02X %02X %02X %02X %02X %02X %02X\n",
+                  buffer[0], buffer[1], buffer[2], buffer[3], 
+                  buffer[4], buffer[5], buffer[6], buffer[7]);
+}
+
 static ssize_t fancount_show(struct device *dev, struct device_attribute *attr, char *buf)
 {
     int ret = hp_wmi_get_fan_count();
@@ -896,10 +896,12 @@ static DEVICE_ATTR_RO(tablet);
 static DEVICE_ATTR_RW(postcode);
 static DEVICE_ATTR_RW(backlight);
 static DEVICE_ATTR_RO(fancount);
+static DEVICE_ATTR_RO(systemdesign);
 
 static struct attribute *hp_wmi_attrs[] = {
 	&dev_attr_backlight.attr,
 	&dev_attr_fancount.attr,
+	&dev_attr_systemdesign.attr,
 	&dev_attr_display.attr,
 	&dev_attr_hddtemp.attr,
 	&dev_attr_als.attr,
@@ -1390,7 +1392,7 @@ static int platform_profile_omen_v1_set_ec(enum platform_profile_option profile)
 
 	switch (profile) {
 	case PLATFORM_PROFILE_PERFORMANCE:
-		tp = FANMODE_PERFORMANCE;
+		tp = FANMODE_L7;
 		gpu_ctgp_enable = true;
 		gpu_ppab_enable = true;
 		gpu_dstate = 1;
