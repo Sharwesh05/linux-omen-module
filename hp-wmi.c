@@ -70,6 +70,32 @@ enum hp_fan_mode { //Performance Mode
     FANMODE_L3                 =  0x40, // 0b01000000
     FANMODE_L4                 =  0x50  // 0b01010000
 };
+
+enum AdapterStatus { //not working but still implementing
+    ADAPTER_NOT_SUPPORTED     = 0x00,  // No smart power adapter support
+    ADAPTER_MEETS_REQUIREMENT = 0x01,  // Sufficient power
+    ADAPTER_BELOW_REQUIREMENT = 0x02,  // Insufficient power
+    ADAPTER_BATTERY_POWER     = 0x03,  // Not on AC power
+    ADAPTER_NOT_FUNCTIONING   = 0x04,  // Malfunction
+    ADAPTER_ERROR             = 0xFF   // Error
+};
+
+enum Throttling {
+    UNKNOWN = 0x00,  // Unknown state (BIOS call failed)
+    ON      = 0x01,  // Thermal throttling enabled
+    DEFAULT = 0x04   // Observed default state
+};
+
+// enum TypeC{
+//     USB_TYPEC_SCENARIO_ERROR = -1,
+//     USB_TYPEC_SCENARIO_OK = 0,
+//     USB_TYPEC_SCENARIO_POWER_ADAPTER_ACCEPTED_MATCHES_CAPABILITIES_TO_CHARGE_WHILE_IN_SX = 1,
+//     USB_TYPEC_SCENARIO_POWER_ADAPTER_REJECTED_PROVIDER_AND_CONSUMER_MISMATCH = 7,
+//     USB_TYPEC_SCENARIO_ALTERNATE_MODE_REJECTED_INCOMPATIBLE_CABLE = 9,
+//     USB_TYPEC_SCENARIO_NON_HP_TYPEC_ADAPTER = 10,
+//     USB_TYPEC_SCENARIO_PORT_OVER_VOLTAGE = 13
+// };
+
 enum hp_gpu_mode{
     GPUMODE_HYBRID   = 0,  // 0x00 - Hybrid graphics mode (or BIOS call failed)
     GPUMODE_DISCRETE = 1,  // 0x01 - Discrete GPU exclusive mode
@@ -169,8 +195,9 @@ enum hp_wmi_command {
 	HPWMI_READ	= 0x01, // Earliest implemented (1)
 	HPWMI_WRITE	= 0x02, // Graphics mode switch (2)
 	HPWMI_ODM	= 0x03,
-	HPWMI_GM	= 0x20008, // Most commands (131080)
+	HPWMI_GM	= 0x20008, // Most commands (131080){working so running in this}
 	HPWMI_GM_v2 = 0X20009, //Current Implementation(going on)
+	HPWMI_GM_v3 = 0X2000b, //typec
 };
 
 enum backlight {
@@ -267,6 +294,42 @@ static bool zero_insize_support;
 static struct rfkill *wifi_rfkill;
 static struct rfkill *bluetooth_rfkill;
 static struct rfkill *wwan_rfkill;
+
+static const char * hp_gpumode(int mode)
+{
+    switch (mode) {
+        case GPUMODE_HYBRID:
+            return "Hybrid graphics mode";
+        case GPUMODE_DISCRETE:
+            return "Discrete GPU exclusive mode";
+        case GPUMODE_OPTIMUS:
+            return "NVIDIA Optimus mode";
+        default:
+            return "Unknown mode";  // In case of an invalid mode
+    }
+}
+
+// static const char *usb_typec(int scenario) {
+//     switch (scenario) {
+//         case USB_TYPEC_SCENARIO_ERROR:
+//             return "Error";
+//         case USB_TYPEC_SCENARIO_OK:
+//             return "Ok";
+//         case USB_TYPEC_SCENARIO_POWER_ADAPTER_ACCEPTED_MATCHES_CAPABILITIES_TO_CHARGE_WHILE_IN_SX:
+//             return "Power Adapter Accepted, Matches Capabilities to Charge While in Sx";
+//         case USB_TYPEC_SCENARIO_POWER_ADAPTER_REJECTED_PROVIDER_AND_CONSUMER_MISMATCH:
+//             return "Power Adapter Rejected, Provider and Consumer Mismatch";
+//         case USB_TYPEC_SCENARIO_ALTERNATE_MODE_REJECTED_INCOMPATIBLE_CABLE:
+//             return "Alternate Mode Rejected, Incompatible Cable";
+//         case USB_TYPEC_SCENARIO_NON_HP_TYPEC_ADAPTER:
+//             return "Non-HP Type-C Adapter";
+//         case USB_TYPEC_SCENARIO_PORT_OVER_VOLTAGE:
+//             return "Port Over Voltage";
+//         default:
+//             return "Unknown scenario";
+//     }
+// }
+
 
 struct rfkill2_device {
 	u8 id;
@@ -507,6 +570,48 @@ static int hp_wmi_set_backlight(enum backlight enabled)
 	return 1;
 }
 
+// static int hp_wmi_get_UsbTypeCScenario(void)
+// {
+// 	int ret;
+// 	u8 data[4]={0x0};
+
+// 	ret = hp_wmi_perform_query(0x01,HPWMI_GM_v3,
+// 				   &data, sizeof(data),128);
+
+// 	if (ret)
+// 		return ret < 0 ? ret : -EINVAL;
+
+// 	return ret;
+// }
+
+static int hp_wmi_get_gpumode(void)
+{
+	int ret;
+	u8 data[4]={0x0};
+
+	ret = hp_wmi_perform_query(HPWMI_GPU_POWER_QUERY,HPWMI_READ,
+				   &data, sizeof(data),sizeof(data));
+
+	if (ret)
+		return ret < 0 ? ret : -EINVAL;
+
+	return ret;
+}
+
+static int hp_wmi_set_gpumode(enum hp_gpu_mode enabled)
+{
+	int ret;
+	u8 data[4]={enabled,0,0,0};
+
+	ret = hp_wmi_perform_query(HPWMI_GPU_POWER_QUERY,HPWMI_GM,
+				   &data, sizeof(data), 0);
+
+	if (ret)
+		return ret < 0 ? ret : -EINVAL;
+
+	return 1;
+}
+
 static int hp_wmi_read_int(int query)
 {
 	int val = 0, ret;
@@ -718,15 +823,35 @@ static int hp_wmi_rfkill2_refresh(void)
 static ssize_t systemdesign_show(struct device *dev, struct device_attribute *attr, char *buf)
 {
     int ret;
-	unsigned char buffer[8] = {0x00};
+	unsigned char buffer[128] = {0x00};
 
 	ret = hp_wmi_perform_query(HPWMI_GET_SYSTEM_DESIGN_DATA, HPWMI_GM, &buffer ,sizeof(buffer), sizeof(buffer));
 	if(ret < 0)
 		return -EINVAL;
 	
-	return sysfs_emit(buf, "%02X %02X %02X %02X %02X %02X %02X %02X\n",
-                  buffer[0], buffer[1], buffer[2], buffer[3], 
-                  buffer[4], buffer[5], buffer[6], buffer[7]);
+	return sysfs_emit(buf, "%02X %02X %02X %02X %02X %02X %02X %02X %02X %02X %02X %02X %02X %02X %02X %02X\n",
+                  buffer[0], buffer[1], buffer[2], buffer[3], buffer[4], buffer[5], buffer[6], buffer[7],
+				  buffer[8], buffer[9], buffer[10], buffer[11], buffer[12], buffer[13], buffer[14], buffer[15]);
+}
+
+// static ssize_t typec_show(struct device *dev, struct device_attribute *attr, char *buf)
+// {
+//     int ret;
+// 	ret = hp_wmi_get_UsbTypeCScenario();
+// 	if(ret < 0)
+// 		return -EINVAL;
+
+// 	return sysfs_emit(buf,"%s\n",usb_typec(ret));
+// }
+
+static ssize_t mux_show(struct device *dev, struct device_attribute *attr, char *buf)
+{
+    int ret;
+	ret = hp_wmi_get_gpumode();
+	if(ret < 0)
+		return -EINVAL;
+
+	return sysfs_emit(buf,"%s\n",hp_gpumode(ret));
 }
 
 static ssize_t fancount_show(struct device *dev, struct device_attribute *attr, char *buf)
@@ -897,9 +1022,11 @@ static DEVICE_ATTR_RW(postcode);
 static DEVICE_ATTR_RW(backlight);
 static DEVICE_ATTR_RO(fancount);
 static DEVICE_ATTR_RO(systemdesign);
+static DEVICE_ATTR_RO(mux);
 
 static struct attribute *hp_wmi_attrs[] = {
 	&dev_attr_backlight.attr,
+	&dev_attr_mux.attr,
 	&dev_attr_fancount.attr,
 	&dev_attr_systemdesign.attr,
 	&dev_attr_display.attr,
