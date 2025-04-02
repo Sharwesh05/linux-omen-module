@@ -1,0 +1,30 @@
+#!/bin/python
+
+import subprocess
+
+if "ec_sys" not in str(subprocess.check_output("lsmod")):
+    subprocess.run(["modprobe", "ec_sys"], check=True)
+
+ECIO_FILE = "/sys/kernel/debug/ec/ec0/io"
+c = 0
+data = b""
+
+with open(ECIO_FILE, "rb") as ec:
+    data = ec.read()
+
+if len(data) < 256:
+    print("Warning: Data length is less than expected (256 bytes).")
+    exit(1)
+
+BLUE = '\033[94m'
+white = '\033[0m'
+
+for i in range(16):
+    for j in range(16):
+        byte_value = data[c]
+        if byte_value != 0:
+            print(f"{BLUE}0x{byte_value:02x}{white}", end=" ")
+        else:
+            print(f"0x{byte_value:02x}", end=" ")
+        c += 1
+    print()

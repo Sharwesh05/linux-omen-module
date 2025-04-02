@@ -1,0 +1,17 @@
+#!/bin/bash
+
+if [ "$#" -ne 1 ]; then
+    echo "Usage: $0 <1 or 0>"
+    exit 1
+fi
+
+fan_control=$1
+
+if [ "$fan_control" -eq 1 ]; then
+	sudo echo 0 | sudo tee /sys/devices/platform/hp-wmi/hwmon/hwmon*/pwm1_enable > /dev/null
+elif [ "$fan_control" -eq 0 ]; then
+	sudo echo 2 | sudo tee /sys/devices/platform/hp-wmi/hwmon/hwmon*/pwm1_enable > /dev/null
+else
+    echo "Invalid input. Please use 1 for max fan speed or 0 for minimum speed."
+    exit 2
+fi
