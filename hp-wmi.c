@@ -85,14 +85,6 @@ enum Throttling {
     ON      = 0x01,  // Thermal throttling enabled
     DEFAULT = 0x04   // Observed default state
 };
-enum AdapterStatus{
-    SMART_ADAPTER_ERROR = -1,
-    SMART_ADAPTER_NOT_SUPPORTED = 0,
-    SMART_ADAPTER_MEETS_REQUIREMENT = 1,
-    SMART_ADAPTER_BELOW_REQUIREMENT = 2,
-    SMART_ADAPTER_BATTERY_POWER = 3,
-    SMART_ADAPTER_NOT_FUNCTIONING = 4
-} 
 
 // enum TypeC{
 //     USB_TYPEC_SCENARIO_ERROR = -1,
@@ -579,16 +571,6 @@ static int hp_wmi_set_backlight(enum backlight enabled)
 	return 1;
 }
 
-static int hp_wmi_get_SmartAdapterStatus(void)
-{
-	int ret;
-	u8 data[4]={0x0};
-
-	ret = hp_wmi_perform_query(HPWMI_ADAPTER_QUERY,HPWMI_READ,NULL, 0,4);
-
-	return ret;
-}
-
 // static int hp_wmi_get_UsbTypeCScenario(void)
 // {
 // 	int ret;
@@ -866,11 +848,11 @@ static ssize_t systemdesign_show(struct device *dev, struct device_attribute *at
 static ssize_t adapter_show(struct device *dev, struct device_attribute *attr, char *buf)
 {
     int ret;
-	ret = hp_wmi_get_SmartAdapterStatus();
+	ret = hp_wmi_read_int(HPWMI_ADAPTER_QUERY);
 	if(ret < 0)
 		return -EINVAL;
 
-	return sysfs_emit(buf,"%s\n",ret);
+	return sysfs_emit(buf,"%02X\n",ret);
 }
 
 static ssize_t mux_show(struct device *dev, struct device_attribute *attr, char *buf)
