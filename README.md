@@ -23,3 +23,5 @@ sudo echo 2 | sudo tee /sys/class/hwmon/hwmon7/pwm1_enable
 The backlight feature has been added for devices that support it.
 
 This adds the note about thermal profiles not being set.
+
+and more .....

@@ -478,6 +478,19 @@ static int hp_wmi_get_fan_count(void)
 	return fan_data[0]; /* BIOS_PROTECTION-{0},OCP-{1},OTP-{2} */
 }
 
+static int* hp_wmi_get_fan_table(void)
+{
+	u8 data[128] = {};
+	int ret;
+
+	ret = hp_wmi_perform_query(HPWMI_FAN_TABLE_GET_QUERY, HPWMI_GM,
+				   &data ,4 ,sizeof(data));
+	if (ret != 0)
+		return -EINVAL;
+
+	return data;
+}
+
 static int hp_wmi_get_fan_speed(int fan)
 {
 	u8 fan_data[128] = {};
