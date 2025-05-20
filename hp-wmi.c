@@ -478,19 +478,6 @@ static int hp_wmi_get_fan_count(void)
 	return fan_data[0]; /* BIOS_PROTECTION-{0},OCP-{1},OTP-{2} */
 }
 
-static int* hp_wmi_get_fan_table(void)
-{
-	u8 data[128] = {};
-	int ret;
-
-	ret = hp_wmi_perform_query(HPWMI_FAN_TABLE_GET_QUERY, HPWMI_GM,
-				   &data ,4 ,sizeof(data));
-	if (ret != 0)
-		return -EINVAL;
-
-	return data;
-}
-
 static int hp_wmi_get_fan_speed(int fan)
 {
 	u8 fan_data[128] = {};
@@ -508,7 +495,7 @@ static int hp_wmi_get_fan_speed(int fan)
 	return fan_data[fan] * 100;
 }
 
-static int hp_wmi_set_fan_speed(char cpu,char gpu)
+static int hp_wmi_set_fan_speed(int cpu,int gpu)
 {
 	u8 fan_speed[2] = { cpu, gpu };
 	int ret;
@@ -881,9 +868,10 @@ static ssize_t mux_show(struct device *dev, struct device_attribute *attr, char 
 static ssize_t fancount_show(struct device *dev, struct device_attribute *attr, char *buf)
 {
     int ret = hp_wmi_get_fan_count();
-	if(ret < 0)
+	int speed = hp_wmi_get_fan_speed(0);
+	if(ret < 0 || speed < 0)
 		return -EINVAL;
-	return sysfs_emit(buf, "%d\n", ret);
+	return sysfs_emit(buf, "fancount : %d\nspeed : %d\n", ret,speed);
 }
 
 static ssize_t backlight_show(struct device *dev, struct device_attribute *attr, char *buf)
@@ -969,6 +957,26 @@ static ssize_t backlight_store(struct device *dev, struct device_attribute *attr
 	return count;
 }
 
+static ssize_t fancount_store(struct device *dev, struct device_attribute *attr,
+				const char *buf, size_t count)
+{	
+	int tmp;
+	int ret;
+	
+	ret = kstrtoint(buf, 16, &tmp);
+	if (ret < 0){
+		pr_warn("Something is wrong\n");
+		return ret;
+	}
+	if (tmp>0 && tmp < 63){
+		hp_wmi_set_fan_speed(tmp,tmp+3);
+	}
+	else{
+		printk("invalid input\n");
+	}
+	return count;
+}
+
 static ssize_t als_store(struct device *dev, struct device_attribute *attr,
 			 const char *buf, size_t count)
 {
@@ -1044,7 +1052,7 @@ static DEVICE_ATTR_RO(dock);
 static DEVICE_ATTR_RO(tablet);
 static DEVICE_ATTR_RW(postcode);
 static DEVICE_ATTR_RW(backlight);
-static DEVICE_ATTR_RO(fancount);
+static DEVICE_ATTR_RW(fancount);
 static DEVICE_ATTR_RO(systemdesign);
 static DEVICE_ATTR_RO(mux);
 static DEVICE_ATTR_RO(adapter);

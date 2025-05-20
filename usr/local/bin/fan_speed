@@ -1,0 +1,17 @@
+#!/bin/bash
+
+# Check if argument is provided
+if [ -z "$1" ]; then
+    echo "Usage: $0 <hex_value>  (e.g., $0 0x14)"
+    exit 1
+fi
+
+hex_value="$1"
+
+# Validate hex format
+if [[ ! $hex_value =~ ^0x[0-9A-Fa-f]+$ ]]; then
+    echo "Error: '$hex_value' is not a valid hexadecimal number (e.g., 0x14)"
+    exit 1
+fi
+
+echo "$hex_value" | sudo tee /sys/devices/platform/hp-wmi/fancount > /dev/null
