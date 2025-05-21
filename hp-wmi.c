@@ -969,7 +969,7 @@ static ssize_t fancount_store(struct device *dev, struct device_attribute *attr,
 		return ret;
 	}
 	if (tmp>0 && tmp < 63){
-		hp_wmi_set_fan_speed(tmp,tmp+3);
+		hp_wmi_set_fan_speed(tmp,tmp);
 	}
 	else{
 		printk("invalid input\n");
