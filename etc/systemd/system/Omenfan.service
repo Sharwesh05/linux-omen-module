@@ -1,0 +1,10 @@
+[Unit]
+Description=Omenfan fan_auto Service
+After=multi-user.target 
+
+[Service]
+ExecStart='/usr/local/bin/Omenfan'
+Type=simple
+
+[Install]
+WantedBy=multi-user.target
