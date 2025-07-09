@@ -1,0 +1,70 @@
+#!/bin/python3
+import subprocess
+import time
+
+# === Configuration ===
+ECIO_FILE = "/sys/kernel/debug/ec/ec0/io"
+AC_STATUS_FILE = "/sys/class/power_supply/ACAD/online"
+LOG_FILE="/tmp/omenfan.log"
+
+BAT_MAP = {35: 0x00, 40: 0x0e, 45: 0x16, 50: 0x20, 55: 0x23, 60: 0x25, 65: 0x29, 70: 0x30, 75: 0x3e}
+PWR_MAP = {35: 0x0e, 40: 0x14, 45: 0x18, 50: 0x22, 55: 0x25, 60: 0x29, 65: 0x30, 70: 0x3e}
+
+def round_to_next_five(temp):
+    return ((temp // 5) * 5) + 5
+
+def sleep_time(temp):
+    match temp:
+        case temp if temp >= 80:
+            return 25
+        case temp if temp >= 70:
+            return 20
+        case temp if temp >= 60:
+            return 15
+        case _:
+            return 13
+
+def get_power_status():
+    with open(AC_STATUS_FILE, 'r') as f:
+        return int(f.read(1))
+
+def log_write(status,temp,fan_target,slp,ws=0):
+    with open(LOG_FILE, 'a') as f:
+        f.write(f"{status} {temp} {fan_target} {slp} {ws}\n")
+    
+def read_ec_data():
+    with open(ECIO_FILE, 'rb') as f:
+        f.seek(20)
+        fan_current = f.read(1)[0]
+
+        f.seek(176)
+        block = f.read(3)
+        tcpu = int.from_bytes([block[0]], 'little')
+        tgpu = int.from_bytes([block[2]], 'little')
+    return fan_current, tcpu, tgpu
+
+def get_fan_value(temp, is_on_ac):
+    table = PWR_MAP if is_on_ac else BAT_MAP
+    return table.get(temp, 0x3e)
+
+def fan_control_loop():
+    while True:
+        ws=0
+        try:
+            status = get_power_status()
+            fan_current, cpu_temp, gpu_temp = read_ec_data()
+
+            temp = round_to_next_five(max(cpu_temp, gpu_temp))
+            fan_target = get_fan_value(temp, status) if temp > 35 else 0x00
+            if fan_current != fan_target:
+                ws=1
+                subprocess.run(['/usr/local/bin/fan_speed', f'{fan_target:#x}'])
+            slp=sleep_time(temp)
+            log_write(status,temp,fan_target,slp,ws)
+            time.sleep(slp)
+        except Exception as e:
+            print(f"{e}")
+            time.sleep(10)
+
+if __name__ == "__main__":
+    fan_control_loop()
