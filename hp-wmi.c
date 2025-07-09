@@ -868,10 +868,17 @@ static ssize_t mux_show(struct device *dev, struct device_attribute *attr, char 
 static ssize_t fancount_show(struct device *dev, struct device_attribute *attr, char *buf)
 {
     int ret = hp_wmi_get_fan_count();
-	int speed = hp_wmi_get_fan_speed(0);
-	if(ret < 0 || speed < 0)
+	if(ret < 0)
 		return -EINVAL;
-	return sysfs_emit(buf, "fancount : %d\nspeed : %d\n", ret,speed);
+	return sysfs_emit(buf, "fancount : %d\n", ret);
+}
+
+static ssize_t fanspeed_show(struct device *dev, struct device_attribute *attr, char *buf)
+{
+	int speed = hp_wmi_get_fan_speed(0);
+	if(speed < 0)
+		return -EINVAL;
+	return sysfs_emit(buf, "speed : %d\n", speed);
 }
 
 static ssize_t backlight_show(struct device *dev, struct device_attribute *attr, char *buf)
@@ -957,7 +964,7 @@ static ssize_t backlight_store(struct device *dev, struct device_attribute *attr
 	return count;
 }
 
-static ssize_t fancount_store(struct device *dev, struct device_attribute *attr,
+static ssize_t fanspeed_store(struct device *dev, struct device_attribute *attr,
 				const char *buf, size_t count)
 {	
 	int tmp;
@@ -968,9 +975,15 @@ static ssize_t fancount_store(struct device *dev, struct device_attribute *attr,
 		pr_warn("Something is wrong\n");
 		return ret;
 	}
-	if (tmp>0 && tmp < 63){
-		hp_wmi_set_fan_speed(tmp,tmp);
+	if (tmp==0)
+	{
+		hp_wmi_set_fan_speed(0,0);
 	}
+	else if (tmp >0 && tmp < 63)
+	{
+		hp_wmi_set_fan_speed(tmp,tmp+3);
+	}
+	
 	else{
 		printk("invalid input\n");
 	}
@@ -1052,7 +1065,8 @@ static DEVICE_ATTR_RO(dock);
 static DEVICE_ATTR_RO(tablet);
 static DEVICE_ATTR_RW(postcode);
 static DEVICE_ATTR_RW(backlight);
-static DEVICE_ATTR_RW(fancount);
+static DEVICE_ATTR_RO(fancount);
+static DEVICE_ATTR_RW(fanspeed);
 static DEVICE_ATTR_RO(systemdesign);
 static DEVICE_ATTR_RO(mux);
 static DEVICE_ATTR_RO(adapter);
@@ -1062,6 +1076,7 @@ static struct attribute *hp_wmi_attrs[] = {
 	&dev_attr_mux.attr,	
 	&dev_attr_adapter.attr,
 	&dev_attr_fancount.attr,
+	&dev_attr_fanspeed.attr,
 	&dev_attr_systemdesign.attr,
 	&dev_attr_display.attr,
 	&dev_attr_hddtemp.attr,

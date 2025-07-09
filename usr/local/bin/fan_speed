@@ -14,4 +14,4 @@ if [[ ! $hex_value =~ ^0x[0-9A-Fa-f]+$ ]]; then
     exit 1
 fi
 
-echo "$hex_value" | sudo tee /sys/devices/platform/hp-wmi/fancount > /dev/null
+echo "$hex_value" | sudo tee /sys/devices/platform/hp-wmi/fanspeed > /dev/null

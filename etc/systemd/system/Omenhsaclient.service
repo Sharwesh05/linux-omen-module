@@ -3,7 +3,7 @@ Description=Omenhsa Client Service
 After=multi-user.target 
 
 [Service]
-ExecStart=/usr/local/bin/Omenhsa
+ExecStart='/usr/local/bin/Omenhsa'
 Type=oneshot
 
 [Install]
