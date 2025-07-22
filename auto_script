@@ -1,0 +1,32 @@
+#!/bin/bash
+
+set -e  # Exit on any error
+
+# Get current kernel version
+KERNEL_VER=$(uname -r)
+MODULE_PATH="/lib/modules/$KERNEL_VER/kernel/drivers/platform/x86/hp"
+
+echo "Using kernel version: $KERNEL_VER"
+echo "Module path: $MODULE_PATH"
+
+# Build the module
+echo "[*] Running make..."
+make
+
+# Compress the module
+echo "[*] Compressing module with zstd..."
+zstd hp-wmi.ko
+
+# Remove existing module
+if [ -f "$MODULE_PATH/hp-wmi.ko.zst" ]; then
+    echo "[*] Removing old module..."
+    sudo rm "$MODULE_PATH/hp-wmi.ko.zst"
+fi
+
+# # Move new module
+echo "[*] Moving new module..."
+sudo mv hp-wmi.ko.zst "$MODULE_PATH"
+
+# Reboot
+echo "[*] Rebooting..."
+sudo shutdown -r now
