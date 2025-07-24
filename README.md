@@ -16,7 +16,7 @@ blacklist the current running hp_wmi driver
 Note
 
 BIOS protection is 120 seconds — so OmenHsa must be called every 120 seconds to maintain fan settings.
-A timer function has been added for this; you can check how it works in the scripts
+A timer function has been added for this; you can check how it works in the scripts.
 
 Max fan set works for 120 seconds.
 This can be done using the application called fan_max using the following command:
