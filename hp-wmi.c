@@ -45,6 +45,7 @@ MODULE_ALIAS("wmi:5FB7F034-2C63-45E9-BE91-3D44E2C707E4");
 #define HP_OMEN_EC_THERMAL_PROFILE_TIMER_OFFSET 0x63
 #define HP_OMEN_EC_THERMAL_PROFILE_OFFSET 0x95
 
+#define HP_WMI_FAN_SPEED_LIMIT 67
 #define HP_FAN_SPEED_AUTOMATIC	 0x00
 #define HP_POWER_LIMIT_DEFAULT	 0x00
 #define HP_POWER_LIMIT_NO_CHANGE 0xFF
@@ -63,12 +64,16 @@ MODULE_ALIAS("wmi:5FB7F034-2C63-45E9-BE91-3D44E2C707E4");
  * contains "PerformanceControl".
  */
 static const char * const omen_thermal_profile_boards[] = {
-	"84DA", "84DB", "84DC", "8574", "8575", "860A", "87B5", "8572", "8573",
-	"8600", "8601", "8602", "8605", "8606", "8607", "8746", "8747", "8749",
-	"874A", "8603", "8604", "8748", "886B", "886C", "878A", "878B", "878C",
-	"88C8", "88CB", "8786", "8787", "8788", "88D1", "88D2", "88F4", "88FD",
-	"88F5", "88F6", "88F7", "88FE", "88FF", "8900", "8901", "8902", "8912",
-	"8917", "8918", "8949", "894A", "89EB", "8BAD", "8A42", "8A15"
+	"84DA", "84DB", "84DC",
+	"8572", "8573", "8574", "8575",
+	"8600", "8601", "8602", "8603", "8604", "8605", "8606", "8607", "860A",
+	"8746", "8747", "8748", "8749", "874A", "8786", "8787", "8788", "878A",
+	"878B", "878C", "87B5",
+	"886B", "886C", "88C8", "88CB", "88D1", "88D2", "88F4", "88F5", "88F6",
+	"88F7", "88FD", "88FE", "88FF",
+	"8900", "8901", "8902", "8912", "8917", "8918", "8949", "894A", "89EB",
+	"8A15", "8A42",
+	"8BAD",
 };
 
 /* DMI Board names of Omen laptops that are specifically set to be thermal
@@ -76,7 +81,8 @@ static const char * const omen_thermal_profile_boards[] = {
  * the get system design information WMI call returns
  */
 static const char * const omen_thermal_profile_force_v0_boards[] = {
-	"8607", "8746", "8747", "8749", "874A", "8748"
+	"8607",
+	"8746", "8747", "8748", "8749", "874A",
 };
 
 /* DMI board names of Omen laptops that have a thermal profile timer which will
@@ -84,65 +90,54 @@ static const char * const omen_thermal_profile_force_v0_boards[] = {
  * "balanced" when reaching zero.
  */
 static const char * const omen_timed_thermal_profile_boards[] = {
-	"8BAD", "8A42", "8A15"
+	"8A15", "8A42",
+	"8BAD",
 };
+
 /* DMI board names of Omen laptops that have a thermal profile timer
  * and cannot be controlled by ec
  */
 static const char * const thermal_profile_v1_boards[] = {
-	"8BCD"
+	"8BCD",
 };
 
 /* DMI Board names of Victus 16-d1xxx laptops */
 static const char * const victus_thermal_profile_boards[] = {
-	"8A25"
+	"8A25",
 };
 
-/* DMI Board names of Victus 16-r1000 and Victus 16-s1000 laptops */
+/* DMI Board names of Victus 16-r and Victus 16-s laptops */
 static const char * const victus_s_thermal_profile_boards[] = {
-	"8C99", "8C9C"
+	"8BBE", "8BD4", "8BD5",
+	"8C78", "8C99", "8C9C",
+	"8D41",
 };
 
-enum hp_fan_mode { //Performance Mode
-    FANMODE_LEGACY_DEFAULT     =  0x00, // 0b00000000
-    FANMODE_LEGACY_PERFORMANCE =  0x01, // 0b00000001
-    FANMODE_LEGACY_COOL        =  0x02, // 0b00000010
-    FANMODE_LEGACY_QUIET       =  0x03, // 0b00000011
-    FANMODE_LEGACY_EXTREME     =  0x04, // 0b00000100
-    FANMODE_L8                 =  0x04, // 0b00000100
-    FANMODE_L0                 =  0x10, // 0b00010000
-    FANMODE_L5                 =  0x11, // 0b00010001
-    FANMODE_L1                 =  0x20, // 0b00100000
-    FANMODE_L6                 =  0x21, // 0b00100001
-    FANMODE_L2                 =  0x30, // 0b00110000
-    FANMODE_L7                 =  0x31, // 0b00110001
-    FANMODE_L3                 =  0x40, // 0b01000000
-    FANMODE_L4                 =  0x50  // 0b01010000
+/*
+ * FANMODE_Lx values were reverse-engineered by observing EC/WMI
+ * calls made by HP Omen Gaming Hub under Windows.
+ */
+enum hp_fan_mode {
+	FANMODE_LEGACY_DEFAULT     =  0x00,
+	FANMODE_LEGACY_PERFORMANCE =  0x01,
+	FANMODE_LEGACY_COOL        =  0x02,
+	FANMODE_LEGACY_QUIET       =  0x03,
+	FANMODE_LEGACY_EXTREME     =  0x04,
+	FANMODE_L8                 =  0x04,
+	FANMODE_L0                 =  0x10,
+	FANMODE_L5                 =  0x11,
+	FANMODE_L1                 =  0x20,
+	FANMODE_L6                 =  0x21,
+	FANMODE_L2                 =  0x30,
+	FANMODE_L7                 =  0x31,
+	FANMODE_L3                 =  0x40,
+	FANMODE_L4                 =  0x50,
 };
 
-enum AdapterStatus { //not working but still implementing
-    ADAPTER_NOT_SUPPORTED     = 0x00,  // No smart power adapter support
-    ADAPTER_MEETS_REQUIREMENT = 0x01,  // Sufficient power
-    ADAPTER_BELOW_REQUIREMENT = 0x02,  // Insufficient power
-    ADAPTER_BATTERY_POWER     = 0x03,  // Not on AC power
-    ADAPTER_NOT_FUNCTIONING   = 0x04,  // Malfunction
-    ADAPTER_ERROR             = 0xFF   // Error
-};
-
-// enum TypeC{
-//     USB_TYPEC_SCENARIO_ERROR = -1,
-//     USB_TYPEC_SCENARIO_OK = 0,
-//     USB_TYPEC_SCENARIO_POWER_ADAPTER_ACCEPTED_MATCHES_CAPABILITIES_TO_CHARGE_WHILE_IN_SX = 1,
-//     USB_TYPEC_SCENARIO_POWER_ADAPTER_REJECTED_PROVIDER_AND_CONSUMER_MISMATCH = 7,
-//     USB_TYPEC_SCENARIO_ALTERNATE_MODE_REJECTED_INCOMPATIBLE_CABLE = 9,
-//     USB_TYPEC_SCENARIO_NON_HP_TYPEC_ADAPTER = 10,
-//     USB_TYPEC_SCENARIO_PORT_OVER_VOLTAGE = 13
-// }; for future adaptation
-
-enum hp_gpu_mode{
-    GPUMODE_HYBRID   = 0x01,  // 0x00 - Hybrid graphics mode (or BIOS call failed)
-    GPUMODE_DISCRETE = 0x01,  // 0x01 - Discrete GPU exclusive mode
-    GPUMODE_OPTIMUS  = 0x02   // 0x02 - NVIDIA Optimus mode
+enum hp_gpu_mode {
+	GPUMODE_HYBRID   = 0x00,  // 0x00 - Hybrid graphics mode (or BIOS call failed)
+	GPUMODE_DISCRETE = 0x01,  // 0x01 - Discrete GPU exclusive mode
+	GPUMODE_OPTIMUS  = 0x02   // 0x02 - NVIDIA Optimus mode
 };
 
 enum hp_wmi_radio {
@@ -205,6 +200,9 @@ enum hp_wmi_commandtype {
 	HPWMI_THERMAL_PROFILE_QUERY	= 0x4c,
 };
 
+/* these hp_power_limits and hp_gpu_power_modes
+ * functions are standard for all hp laptops
+ */
 struct hp_power_limits {
 	u8 pl1;
 	u8 pl2;
@@ -219,43 +217,53 @@ struct hp_gpu_power_modes {
 	u8 gpu_slowdown_temp;
 };
 
+/*
+ * HPWMI GM (General Method) command identifiers.
+ *
+ * HP laptops ship with different firmware implementations depending
+ * on the BIOS vendor. In practice, HP mainly uses:
+ *
+ *  - AMI-based BIOS: common on older and some consumer platforms
+ *  - Insyde-based BIOS: common on newer OMEN / Victus platforms
+ *
+ * While the WMI GUID remains the same, the command IDs and payload
+ * formats differ between these firmware implementations. The command
+ * names below reflect the firmware variant they are known to work with.
+ */
 enum hp_wmi_gm_commandtype {
 	HPWMI_AMI_FAN_SPEED_GET_QUERY		= 0x11,
-	HPWMI_SET_PERFORMANCE_MODE			= 0x1A,
+	HPWMI_SET_PERFORMANCE_MODE		= 0x1A,
 	HPWMI_FAN_SPEED_MAX_GET_QUERY		= 0x26,
 	HPWMI_FAN_SPEED_MAX_SET_QUERY		= 0x27,
 	HPWMI_GET_SYSTEM_DESIGN_DATA		= 0x28,
 	HPWMI_INSYDE_FAN_SPEED_GET_QUERY	= 0x2D,
 	HPWMI_INSYDE_FAN_SPEED_SET_QUERY	= 0x2E,
-	HPWMI_FAN_COUNT_GET_QUERY			= 0x10,
+	HPWMI_FAN_COUNT_GET_QUERY		= 0x10,
 	HPWMI_GET_GPU_THERMAL_MODES_QUERY	= 0x21,
 	HPWMI_SET_GPU_THERMAL_MODES_QUERY	= 0x22,
 	HPWMI_SET_POWER_LIMITS_QUERY		= 0x29,
-	HPWMI_GET_TEMPERATURE_QUERY			= 0x23,
-	HPWMI_FAN_TABLE_GET_QUERY			= 0x2F,
-	HPWMI_FAN_TABLE_SET_QUERY			= 0x32,
-	HPWMI_CPU_POWER_SET_QUERY			= 0X29,
-	HPWMI_GPU_POWER_QUERY				= 0X52, //MUX
-	HPWMI_ADAPTER_QUERY					= 0x0F, //Adapter
-};
-
-enum hp_wmi_kb_commandtype{
-	HPWMI_GET_BACKLIGHT = 0x04,
-	HPWMI_SET_BACKLIGHT = 0x05,
+	HPWMI_GET_TEMPERATURE_QUERY		= 0x23,
+	HPWMI_FAN_TABLE_GET_QUERY		= 0x2F,
+	HPWMI_FAN_TABLE_SET_QUERY		= 0x32,
+	HPWMI_CPU_POWER_SET_QUERY		= 0X29,
+	HPWMI_GPU_POWER_QUERY			= 0X52, //mux status
+	HPWMI_ADAPTER_QUERY			= 0x0F,
+	HPWMI_GET_BACKLIGHT			= 0x04,
+	HPWMI_SET_BACKLIGHT			= 0x05,
 };
 
 enum hp_wmi_backlight {
-    BACKLIGHT_OFF = 0x64,  // 0b01100100 - Keyboard backlight off
-    BACKLIGHT_ON  = 0xE4   // 0b11100100 - Keyboard backlight on
+	BACKLIGHT_OFF = 0x64,
+	BACKLIGHT_ON  = 0xE4,
 };
 
 enum hp_wmi_command {
-	HPWMI_READ	= 0x01, // Earliest implemented (1)
-	HPWMI_WRITE	= 0x02, // Graphics mode switch (2)
+	HPWMI_READ	= 0x01, // Earliest implemented
+	HPWMI_WRITE	= 0x02, // Graphics mode switch
 	HPWMI_ODM	= 0x03,
-	HPWMI_GM	= 0x20008, // Most commands (131080){working so running in this}
-	HPWMI_GM_v2 = 0X20009, //Current Implementation(going on)
-	HPWMI_GM_v3 = 0X2000b, //typec
+	HPWMI_GM	= 0x20008, // Most commands {working so running in this}
+	HPWMI_GM_v2 = 0X20009, //Current Implementation {development going on}
+	HPWMI_GM_v3 = 0X2000b, //typeC status
 };
 
 enum hp_wmi_hardware_mask {
@@ -483,12 +491,15 @@ out_free:
 }
 
 /*
- * Calling this hp_wmi_get_fan_count function also enables
- * and/or maintains the laptop in user defined thermal and fan states, instead
- * of using a fallback state. After a 120 seconds timeout however, the laptop
- * goes back to its fallback state.
- * this is solved by creating a timer or service to call 
- * this function every 120 seconds(from omen gaming hub)
+ * Calling this function queries the firmware for the number of fans.
+ *
+ * On some HP platforms, issuing this query also enables and maintains
+ * user-selected thermal and fan control modes, preventing the firmware
+ * from falling back to its default thermal behavior.
+ *
+ * On new systems, the firmware has been observed to revert to the
+ * fallback state if this query is not issued for approximately 120
+ * seconds. This timeout is firmware-defined and undocumented.
  */
 static int hp_wmi_get_fan_count(void)
 {
@@ -501,8 +512,18 @@ static int hp_wmi_get_fan_count(void)
 	if (ret != 0)
 		return -EINVAL;
 
-	printk("Bios-control off(120s) {for latest hp devices}\n");
-	return fan_data[0]; /* BIOS_PROTECTION-{0},OCP-{1},OTP-{2} */
+	pr_debug("Refreshing firmware fan/thermal control state\n");
+	/*
+	 * fan_data[0] returns a firmware-defined status value.
+	 *
+	 * Observed values:
+	 *   0 - Normal operation / no protection active
+	 *   1 - OCP (Over-Current Protection) active
+	 *   2 - OTP (Over-Temperature Protection) active
+	 *
+	 * Exact semantics are undocumented and may vary by platform.
+	 */
+	return fan_data[0];
 }
 
 static int hp_wmi_get_fan_speed_ami(int fan)
@@ -531,22 +552,25 @@ static int hp_wmi_get_fan_speed_insyde(int fan)
 	if (fan < 0 || fan >= sizeof(fan_data))
 		return -EINVAL;
 
-	ret = hp_wmi_perform_query(HPWMI_INSYDE_FAN_SPEED_GET_QUERY,
-				   HPWMI_GM, &fan_data, sizeof(u8),
-				   sizeof(fan_data));
+	ret = hp_wmi_perform_query(HPWMI_INSYDE_FAN_SPEED_GET_QUERY, HPWMI_GM,
+					&fan_data, sizeof(u8), sizeof(fan_data));
+
 	if (ret != 0)
 		return -EINVAL;
 
 	return fan_data[fan] * 100;
 }
 
-static int hp_wmi_set_fan_speed(int cpu,int gpu)
+static int hp_wmi_set_fan_speed(int cpu, int gpu)
 {
 	u8 fan_speed[2] = { cpu, gpu };
 	int ret;
 
 	ret = hp_wmi_perform_query(HPWMI_INSYDE_FAN_SPEED_SET_QUERY, HPWMI_GM,
 				   &fan_speed, sizeof(fan_speed), 0);
+
+	if (ret)
+		return ret < 0 ? ret : -EINVAL;
 
 	return ret;
 }
@@ -585,6 +609,9 @@ static int hp_wmi_fan_speed_reset(void)
 	ret = hp_wmi_perform_query(HPWMI_INSYDE_FAN_SPEED_SET_QUERY, HPWMI_GM,
 				   &fan_speed, sizeof(fan_speed), 0);
 
+	if (ret)
+		return ret < 0 ? ret : -EINVAL;
+
 	return ret;
 }
 
@@ -598,57 +625,45 @@ static int hp_wmi_fan_speed_max_reset(void)
 
 	/* Disabling max fan speed on Insyde laptops needs a 2nd step: */
 	ret = hp_wmi_fan_speed_reset();
+
 	return ret;
 }
 
 static int hp_wmi_get_backlight(void)
 {
 	int ret;
-	u8 data[4]={};
+	u8 data[4] = {};
 
-	ret = hp_wmi_perform_query(HPWMI_GET_BACKLIGHT,HPWMI_GM_v2,
-				   &data, sizeof(u8),sizeof(data));
+	ret = hp_wmi_perform_query(HPWMI_GET_BACKLIGHT, HPWMI_GM_v2,
+				   &data, sizeof(u8), sizeof(data));
 
 	if (ret)
 		return ret < 0 ? ret : -EINVAL;
-	return (data[0]==0x00)?0:1;
+
+	return (data[0] == 0x00) ? 0 : 1;
 }
 
 static int hp_wmi_set_backlight(enum hp_wmi_backlight enabled)
 {
 	int ret;
-	u8 data[4]={enabled,0,0,0};
+	u8 data[4] = { enabled, 0, 0, 0 };
 
-	ret = hp_wmi_perform_query(HPWMI_SET_BACKLIGHT,HPWMI_GM_v2,
+	ret = hp_wmi_perform_query(HPWMI_SET_BACKLIGHT, HPWMI_GM_v2,
 				   &data, sizeof(data), 0);
 
 	if (ret)
 		return ret < 0 ? ret : -EINVAL;
 
-	return 1;
+	return ret;
 }
-
-// static int hp_wmi_get_UsbTypeCScenario(void)
-// {
-// 	int ret;
-// 	u8 data[4]={0x0};
-
-// 	ret = hp_wmi_perform_query(0x01,HPWMI_GM_v3,
-// 				   &data, sizeof(data),128);
-
-// 	if (ret)
-// 		return ret < 0 ? ret : -EINVAL;
-
-// 	return ret;
-// } for future adaptation {not working for some reason in linux}
 
 static int hp_wmi_get_gpumode(void)
 {
 	int ret;
-	u8 data[4]={0x00};
+	u8 data[4] = {};
 
-	ret = hp_wmi_perform_query(HPWMI_GPU_POWER_QUERY,HPWMI_READ,
-				   &data, sizeof(data),sizeof(data));
+	ret = hp_wmi_perform_query(HPWMI_GPU_POWER_QUERY, HPWMI_READ,
+				   &data, sizeof(data), sizeof(data));
 
 	if (ret)
 		return ret < 0 ? ret : -EINVAL;
@@ -659,9 +674,9 @@ static int hp_wmi_get_gpumode(void)
 static int hp_wmi_set_gpumode(enum hp_gpu_mode enabled)
 {
 	int ret;
-	u8 data[4]={enabled,0x00,0x00,0x00};
+	u8 data[4] = { enabled, 0x00, 0x00, 0x00 };
 
-	ret = hp_wmi_perform_query(HPWMI_GPU_POWER_QUERY,HPWMI_WRITE,
+	ret = hp_wmi_perform_query(HPWMI_GPU_POWER_QUERY, HPWMI_WRITE,
 				   &data, sizeof(data), 0);
 
 	if (ret)
@@ -725,7 +740,7 @@ static int omen_thermal_profile_set(int mode)
 	 * 255, so let's mimic this behaviour to be as close as possible to
 	 * the original software.
 	 */
-	char buffer[2] = {-1, mode};
+	char buffer[2] = { -1, mode };
 	int ret;
 
 	ret = hp_wmi_perform_query(HPWMI_SET_PERFORMANCE_MODE, HPWMI_GM,
@@ -903,67 +918,45 @@ static int hp_wmi_rfkill2_refresh(void)
 }
 
 static ssize_t systemdesign_show(struct device *dev, struct device_attribute *attr,
-                        char *buf)
+				char *buf)
 {
-	int ret, i;
+	int ret;
 	u8 buffer[128];
-	ssize_t len = 0;
 
-	ret = hp_wmi_perform_query(HPWMI_GET_SYSTEM_DESIGN_DATA,
-				  HPWMI_GM,
-				  buffer,
-				  sizeof(buffer),
-				  sizeof(buffer));
+	ret = hp_wmi_perform_query(HPWMI_GET_SYSTEM_DESIGN_DATA, HPWMI_GM,
+					buffer, sizeof(buffer), sizeof(buffer));
 	if (ret < 0)
 		return ret;
-
-	for (i = 0; i < 16; i++)
-		len += sysfs_emit_at(buf, len, "%02x ", buffer[i]);
-	buf[len - 1] = '\n';
-
-	return len;
+	return sysfs_emit(buf, "%*ph\n", (int)sizeof(buffer), buffer);
 }
-
-
-// static ssize_t typec_show(struct device *dev, struct device_attribute *attr, char *buf)
-// {
-//     int ret;
-// 	ret = hp_wmi_get_UsbTypeCScenario();
-// 	if(ret < 0)
-// 		return -EINVAL;
-
-// 	return sysfs_emit(buf,"%s\n",usb_typec(ret));
-// }
 
 static ssize_t adapter_show(struct device *dev, struct device_attribute *attr,
 				char *buf)
 {
-    int ret;
-	ret = hp_wmi_read_int(HPWMI_ADAPTER_QUERY);
-	if(ret < 0)
-		return -EINVAL;
+	int ret = hp_wmi_read_int(HPWMI_ADAPTER_QUERY);
 
-	return sysfs_emit(buf,"%02X\n",ret);
+	if (ret < 0)
+		return -EINVAL;
+	return sysfs_emit(buf, "%02X\n", ret);
 }
 
 static ssize_t mux_show(struct device *dev, struct device_attribute *attr,
 				char *buf)
 {
-int ret = hp_wmi_get_gpumode();
+	int ret = hp_wmi_get_gpumode();
 
-    if (ret < 0)
-        return ret;
-
-    return sysfs_emit(buf, "%d\n", ret);
+	if (ret < 0)
+		return ret;
+	return sysfs_emit(buf, "%d\n", ret);
 }
-
 
 static ssize_t fancount_show(struct device *dev, struct device_attribute *attr,
 				char *buf)
 {
-    int ret = hp_wmi_get_fan_count();
-	if(ret < 0)
-		return -EINVAL;
+	int ret = hp_wmi_get_fan_count();
+
+	if (ret < 0)
+		return ret;
 	return sysfs_emit(buf, "fancount : %d\n", ret);
 }
 
@@ -971,18 +964,20 @@ static ssize_t fanspeed_show(struct device *dev, struct device_attribute *attr,
 				char *buf)
 {
 	int speed = hp_wmi_get_fan_speed_insyde(0);
-	if(speed < 0)
-		return -EINVAL;
+
+	if (speed < 0)
+		return speed;
 	return sysfs_emit(buf, "speed : %d\n", speed);
 }
 
 static ssize_t backlight_show(struct device *dev, struct device_attribute *attr,
 				char *buf)
 {
-    int ret = hp_wmi_get_backlight();
-	if(ret < 0)
-		return -EINVAL;
-	return sysfs_emit(buf, "%d\n", ret);
+	int ret = hp_wmi_get_backlight();
+
+	if (ret < 0)
+		return ret;
+	return sysfs_emit(buf, "backlight : %d\n", ret);
 }
 
 static ssize_t display_show(struct device *dev, struct device_attribute *attr,
@@ -1048,10 +1043,11 @@ static ssize_t postcode_show(struct device *dev, struct device_attribute *attr,
 
 static ssize_t backlight_store(struct device *dev, struct device_attribute *attr,
 				const char *buf, size_t count)
-{	
-	int ret;
+{
 	bool enable;
-	
+	int ret;
+
+	/* To set bios-protection state to 0 */
 	hp_wmi_get_fan_count();
 	ret = kstrtobool(buf, &enable);
 	if (ret)
@@ -1063,48 +1059,48 @@ static ssize_t backlight_store(struct device *dev, struct device_attribute *attr
 		hp_wmi_set_backlight(BACKLIGHT_OFF);
 
 	return count;
-	return count;
 }
 
 static ssize_t mux_store(struct device *dev, struct device_attribute *attr,
 				const char *buf, size_t count)
-{	
+{
 	int ret;
 	int enable;
 
+	/* To set bios-protection state to 0 */
 	hp_wmi_get_fan_count();
-	ret = kstrtoint(buf ,10 ,&enable);
+
+	ret = kstrtoint(buf, 10, &enable);
 	if (ret)
 		return ret;
 
-	if(ret>2)
+	if (ret > 2)
 		return ret;
-	
-	hp_wmi_set_gpumode(enable);
 
-	pr_info("mux mode is now set to: %d\n",enable);
-
+	ret = hp_wmi_set_gpumode(enable);
+	if (ret)
+		return ret;
+	pr_debug("mux mode is now set to: %d\n", enable);
 	return count;
 }
 
 static ssize_t fanspeed_store(struct device *dev, struct device_attribute *attr,
 				const char *buf, size_t count)
-{	
-	int tmp;
+{
+	int fan;
 	int ret;
-	
-	ret = kstrtoint(buf, 16, &tmp);
-	if (ret < 0){
-		pr_warn("Something is wrong\n");
+
+	ret = kstrtoint(buf, 16, &fan);
+	if (ret < 0)
 		return ret;
-	}
-	if (tmp==0) {
-		hp_wmi_set_fan_speed(0,0);
-	} else if (tmp >0 && tmp < 71) {
-		hp_wmi_set_fan_speed(tmp,tmp+3);
-	} else {
-		printk("invalid input\n");
-	}
+
+	if (fan == 0)
+		hp_wmi_set_fan_speed(0, 0);
+
+	/* 67*100 is the maximum RPM known for HP laptops */
+	if (fan > 0 && fan < HP_WMI_FAN_SPEED_LIMIT-3)
+		/* The GPU fan RPM is 300 RPM higher than the CPU fan RPM. */
+		hp_wmi_set_fan_speed(fan, fan+3);
 	return count;
 }
 
@@ -1191,7 +1187,7 @@ static DEVICE_ATTR_RO(adapter);
 
 static struct attribute *hp_wmi_attrs[] = {
 	&dev_attr_backlight.attr,
-	&dev_attr_mux.attr,	
+	&dev_attr_mux.attr,
 	&dev_attr_adapter.attr,
 	&dev_attr_fancount.attr,
 	&dev_attr_fanspeed.attr,
@@ -1802,7 +1798,7 @@ static int platform_profile_victus_get_ec(enum platform_profile_option *profile)
 	case FANMODE_LEGACY_PERFORMANCE:
 		*profile = PLATFORM_PROFILE_PERFORMANCE;
 		break;
-	case FANMODE_LEGACY_DEFAULT :
+	case FANMODE_LEGACY_DEFAULT:
 		*profile = PLATFORM_PROFILE_BALANCED;
 		break;
 	case FANMODE_LEGACY_QUIET:
@@ -1831,7 +1827,7 @@ static int platform_profile_victus_set_ec(enum platform_profile_option profile)
 		tp = FANMODE_LEGACY_PERFORMANCE;
 		break;
 	case PLATFORM_PROFILE_BALANCED:
-		tp = FANMODE_LEGACY_DEFAULT ;
+		tp = FANMODE_LEGACY_DEFAULT;
 		break;
 	case PLATFORM_PROFILE_QUIET:
 		tp = FANMODE_LEGACY_QUIET;
@@ -1952,13 +1948,13 @@ static int platform_profile_victus_s_set_ec(enum platform_profile_option profile
 		gpu_dstate = 1;
 		break;
 	case PLATFORM_PROFILE_BALANCED:
-		tp = FANMODE_LEGACY_DEFAULT ;
+		tp = FANMODE_LEGACY_DEFAULT;
 		gpu_ctgp_enable = false;
 		gpu_ppab_enable = true;
 		gpu_dstate = 1;
 		break;
 	case PLATFORM_PROFILE_LOW_POWER:
-		tp = FANMODE_LEGACY_DEFAULT ;
+		tp = FANMODE_LEGACY_DEFAULT;
 		gpu_ctgp_enable = false;
 		gpu_ppab_enable = false;
 		gpu_dstate = 1;
@@ -2217,22 +2213,15 @@ static int omen_v1_powersource_event(struct notifier_block *nb,
 	pr_debug("Received power source device event\n");
 
 	/*
-	 * Switching to battery power source while Performance mode is active
+	 * Switching to battery power source while any mode is active
 	 * needs manual triggering of CPU power limits. Same goes when switching
-	 * to AC power source while Performance mode is active. Other modes
-	 * however are automatically behaving without any manual action.
-	 * Seen on OMEN v1 Boards.
+	 * to AC power source.
+	 * Observed on OMEN v1 boards.
 	 */
-
-	if (active_platform_profile == PLATFORM_PROFILE_PERFORMANCE) {
-		pr_debug("Triggering CPU PL1/PL2 actualization\n");
-		err = hp_wmi_set_cpu_pl1_pl2(HP_POWER_LIMIT_DEFAULT,
-					       HP_POWER_LIMIT_DEFAULT);
-		if (err)
-			pr_warn("Failed to actualize power limits: %d\n", err);
-
-		return NOTIFY_DONE;
-	}
+	err = hp_wmi_set_cpu_pl1_pl2(HP_POWER_LIMIT_DEFAULT,
+						HP_POWER_LIMIT_DEFAULT);
+	if (err)
+		pr_warn("Failed to actualize power limits: %d\n", err);
 
 	return NOTIFY_OK;
 }
@@ -2370,7 +2359,11 @@ static int thermal_profile_setup(struct platform_device *device)
 			return err;
 
 		ops = &platform_profile_victus_s_ops;
-	} else if (is_omen_v1_thermal_profile()) {		 
+	} else if (is_omen_v1_thermal_profile()) {
+		/*
+		 * Being unable to retrieve laptop's current thermal profile,
+		 * So doing the same process as above.
+		 */
 		active_platform_profile = PLATFORM_PROFILE_BALANCED;
 
 		err = platform_profile_omen_v1_set_ec(active_platform_profile);
@@ -2702,8 +2695,8 @@ static void __exit hp_wmi_exit(void)
 
 	if (is_victus_s_thermal_profile())
 		victus_s_unregister_powersource_event_handler();
-	
-	if (is_omen_v1_thermal_profile()) 
+
+	if (is_omen_v1_thermal_profile())
 		omen_v1_unregister_powersource_event_handler();
 
 	if (wmi_has_guid(HPWMI_EVENT_GUID))
