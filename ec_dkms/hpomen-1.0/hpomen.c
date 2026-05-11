@@ -989,12 +989,12 @@ static ssize_t fanspeed_store(struct device *dev, struct device_attribute *attr,
 
 	if (fan == 0)
 		hp_wmi_set_fan_speed(0, 0);
-
+	else
+		hp_wmi_set_fan_speed(fan, fan+3);
 	// need to be fixed
 	// /* 67*100 is the maximum RPM known for HP laptops */
 	// if (fan > 0 && fan < HP_WMI_FAN_SPEED_LIMIT-3)
 	// 	/* The GPU fan RPM is 300 RPM higher than the CPU fan RPM. */
-	hp_wmi_set_fan_speed(fan, fan+3);
 	return count;
 }
 
