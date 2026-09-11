@@ -1,11 +1,33 @@
 #!/bin/python3
+import os
 import subprocess
 import time
 
 # === Configuration ===
-ECIO_FILE = "/sys/kernel/debug/ec/ec0/io"
 AC_STATUS_FILE = "/sys/class/power_supply/ACAD/online"
-LOG_FILE="/tmp/omenfan.log"
+LOG_FILE = "/tmp/omenfan.log"
+
+
+def resolve_ec_path():
+    """Pick the EC I/O path.
+
+    If `ec_sys` is loaded we read the EC through the in-tree debugfs
+    interface at `/sys/kernel/debug/ec/ec0/io`.
+
+    Otherwise we fall back to the char device exposed by the out-of-tree
+    `acpi_ec` module at `/dev/ec`, `modprobe`-ing it as required.
+    """
+    try:
+        loaded = subprocess.check_output(["lsmod"], text=True)
+    except Exception:
+        loaded = ""
+    if "ec_sys" in loaded and os.path.exists("/sys/kernel/debug/ec/ec0/io"):
+        return "/sys/kernel/debug/ec/ec0/io"
+    subprocess.run(["modprobe", "acpi_ec"], check=False)
+    return "/dev/ec"
+
+
+ECIO_FILE = resolve_ec_path()
 
 BAT_MAP = {35: 0x00, 40: 0x0e, 45: 0x16, 50: 0x20, 55: 0x23, 60: 0x25, 65: 0x29, 70: 0x30, 75: 0x3e}
 PWR_MAP = {35: 0x0e, 40: 0x14, 45: 0x18, 50: 0x22, 55: 0x25, 60: 0x29, 65: 0x30, 70: 0x3e}

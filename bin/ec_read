@@ -1,16 +1,48 @@
 #!/bin/python
 
+import os
 import subprocess
 
-if "ec_sys" not in str(subprocess.check_output("lsmod")):
-    subprocess.run(["modprobe", "ec_sys"], check=True)
 
-ECIO_FILE = "/sys/kernel/debug/ec/ec0/io"
+def resolve_ec_path():
+    """Pick the EC I/O path.
+
+    If `ec_sys` is loaded we read the EC through the in-tree debugfs
+    interface at `/sys/kernel/debug/ec/ec0/io`.
+
+    Otherwise we fall back to the char device exposed by the out-of-tree
+    `acpi_ec` module at `/dev/ec`, `modprobe`-ing it as required.
+    """
+    try:
+        loaded = subprocess.check_output(["lsmod"], text=True)
+    except Exception:
+        loaded = ""
+    if "ec_sys" in loaded and os.path.exists("/sys/kernel/debug/ec/ec0/io"):
+        return "/sys/kernel/debug/ec/ec0/io"
+    subprocess.run(["modprobe", "acpi_ec"], check=False)
+    return "/dev/ec"
+
+
+def require_root():
+    """Exit unless the script is running as root."""
+    if os.geteuid() != 0:
+        print("Error: this script requires root privileges (run via sudo or as root).")
+        exit(1)
+
+
+require_root()
+
+ECIO_FILE = resolve_ec_path()
 c = 0
 data = b""
 
-with open(ECIO_FILE, "rb") as ec:
-    data = ec.read()
+try:
+    with open(ECIO_FILE, "rb") as ec:
+        data = ec.read()
+except PermissionError:
+    print("Error: permission denied accessing %s; retrying with sudo..." % ECIO_FILE)
+    subprocess.run(["sudo", "/usr/local/bin/ec_read"], check=False)
+    exit(1)
 
 if len(data) < 256:
     print("Warning: Data length is less than expected (256 bytes).")

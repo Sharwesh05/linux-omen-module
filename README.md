@@ -1,118 +1,157 @@
-Removed. Below is the **cleaned README** with the **entire “Important Notice” / `$USER` section deleted**, nothing else changed.
+# linux-omen-module
+
+This repository ships **two DKMS kernel modules** for HP OMEN laptops (DMI
+board name **`8BCD`**):
+
+| Module    | Purpose                                                                 |
+| --------- | ----------------------------------------------------------------------- |
+| `hpomen`  | Drop-in replacement for the stock `hp_wmi` driver (fans, MUX, hotkeys, platform profiles, etc.). |
+| `acpi_ec` | Out-of-tree EC access driver. Used **only** when the in-tree `ec_sys` module is not available. |
+
+Helper binaries in `bin/` (e.g. `fan_speed`, `fan_max`, `ec_read`, `Omenfan`,
+`Omenhsa`) are intended to be installed into `/usr/local/bin/` so they can be
+called directly from the shell or from the supplied systemd units.
 
 ---
 
-# linux-omen-module
+## 1. Blacklist `hp_wmi`
 
-## Blacklist the Stock `hp-wmi` Driver
-
-Before using this module, **blacklist the currently running `hp-wmi` kernel driver** to avoid conflicts.
-
-Create a blacklist file:
+`hpomen` clashes with the stock `hp_wmi` driver, so the latter has to be
+blacklisted before `hpomen` can take over.
 
 ```bash
 echo "blacklist hp_wmi" | sudo tee /etc/modprobe.d/blacklist-hp_wmi.conf
+sudo update-initramfs -u   # Debian/Ubuntu
+# or
+sudo dracut -f             # Fedora/Arch
 ```
 
-Then reboot your system.
+Reboot afterwards.
 
 ---
 
-## Build the Module
+## 2. Install the DKMS modules
 
-1. Build the kernel module:
-
-   ```bash
-   make
-   ```
-
-2. After a successful build, copy the generated module file:
-
-   ```bash
-   hpwmi.ko
-   ```
-
-   to the appropriate kernel module directory as described in the documentation or installation guide.
-
-3. Copy the provided **binaries and systemd unit files** to the locations specified in their respective folders.
-
----
-
-## Fan Control
-
-### Max Fan Mode
-
-Fan max mode is controlled directly via **sysfs**.
-
-* **Enable Max Fan Mode**
-
-  ```bash
-  echo 0 | sudo tee /sys/devices/platform/hp-wmi/hwmon/hwmon*/pwm1_enable > /dev/null
-  ```
-
-* **Restore Default (Automatic) Fan Control**
-
-  ```bash
-  echo 1 | sudo tee /sys/devices/platform/hp-wmi/hwmon/hwmon*/pwm1_enable > /dev/null
-  ```
-
----
-
-### Manual Fan Speed Control
-
-Manual fan speed control is performed via **sysfs**.
-
-* Set fan speed using a hexadecimal value:
-
-  ```bash
-  echo "$hex_value" | sudo tee /sys/devices/platform/hp-wmi/fanspeed > /dev/null
-  ```
-
-Example:
+Both modules are DKMS-ready. Place the source trees somewhere persistent
+(e.g. `/usr/src/`) and register them with DKMS.
 
 ```bash
-hex_value=0x32
-echo "$hex_value" | sudo tee /sys/devices/platform/hp-wmi/fanspeed > /dev/null
+sudo cp -r hpomen-1.0   /usr/src/
+sudo cp -r acpi_ec-1.0  /usr/src/
+
+sudo dkms add    hpomen/1.0
+sudo dkms add    acpi_ec/1.0
+
+sudo dkms build  hpomen/1.0
+sudo dkms build  acpi_ec/1.0
+
+sudo dkms install hpomen/1.0
+sudo dkms install acpi_ec/1.0
+```
+
+### Loading rules
+
+* **`hpomen`** replaces `hp_wmi` and should be loaded at startup:
+
+  ```bash
+  echo "hpomen" | sudo tee /etc/modules-load.d/hpomen.conf
+  ```
+
+* **`acpi_ec`** must only be loaded when the in-tree `ec_sys` module is
+  **not** present. Use a soft-dependency so DKMS / modprobe picks the right
+  one:
+
+  ```bash
+  echo "softdep acpi_ec pre: ec_sys" | sudo tee /etc/modprobe.d/acpi_ec.conf
+  ```
+
+  In practice: if your kernel already exposes `ec_sys` (`/sys/kernel/debug/ec/ec0/io`),
+  keep using `ec_sys`; only fall back to `acpi_ec` on kernels/distros where
+  `ec_sys` is missing.
+
+---
+
+## 3. Install the helper binaries
+
+The `bin/` directory contains executable scripts used by the helper
+systemd units and for manual fan control. Copy everything to
+`/usr/local/bin/` so they live on the default `PATH`:
+
+```bash
+sudo install -m 0755 bin/fan_max   /usr/local/bin/
+sudo install -m 0755 bin/fan_speed /usr/local/bin/
+sudo install -m 0755 bin/ec_read   /usr/local/bin/
+sudo install -m 0755 bin/Omenfan   /usr/local/bin/
+sudo install -m 0755 bin/Omenhsa   /usr/local/bin/
+```
+
+### What each binary does
+
+| Binary       | Type    | Function |
+| ------------ | ------- | -------- |
+| `fan_speed`  | bash    | Write a hexadecimal fan-speed value to `/sys/devices/platform/hp-wmi/fanspeed` (e.g. `fan_speed 0x32`). |
+| `fan_max`    | bash    | Toggle max fan mode via `pwm1_enable` (`1` → max, stops `Omenfan.service`; `0` → automatic, starts it). |
+| `ec_read`    | python  | Dump the 256-byte EC space; auto-detects `ec_sys` (`/sys/kernel/debug/ec/ec0/io`) vs `acpi_ec` (`/dev/ec`). |
+| `Omenfan`    | python  | Closed-loop daemon: reads CPU/GPU temps via EC and adjusts the fan via `fan_speed`. |
+| `Omenhsa`    | bash    | One-shot poke at `/sys/devices/platform/hp-wmi/fancount`; driven by `Omenhsaclient.timer`. |
+
+---
+
+## 4. Systemd units (required for automatic fan / thermal profile)
+
+The units in `etc/systemd/system/` **must** be installed into the global
+systemd location (`/etc/systemd/system/`). They are not optional:
+
+| Unit file                  | Purpose                                                                                  |
+| -------------------------- | ---------------------------------------------------------------------------------------- |
+| `Omenfan.service`          | Runs the `Omenfan` daemon so the fan is controlled automatically.                        |
+| `Omenhsaclient.service`    | One-shot helper invoked by the timer to poke the thermal-profile / HSA interface.        |
+| `Omenhsaclient.timer`      | Schedules `Omenhsaclient.service` so the thermal profile is refreshed at startup / periodically. |
+
+Install and activate them:
+
+```bash
+sudo cp etc/systemd/system/Omenfan.service        /etc/systemd/system/
+sudo cp etc/systemd/system/Omenhsaclient.service /etc/systemd/system/
+sudo cp etc/systemd/system/Omenhsaclient.timer   /etc/systemd/system/
+
+sudo systemctl daemon-reload
+
+# Start the fan auto-control daemon now + on boot
+sudo systemctl enable --now Omenfan.service
+
+# Start the thermal-profile scheduler now + on boot
+sudo systemctl enable --now Omenhsaclient.timer
+```
+
+Verify with:
+
+```bash
+systemctl status Omenfan.service Omenhsaclient.timer --no-pager
+systemctl list-timers Omenhsaclient.timer --no-pager
 ```
 
 ---
 
-## GPU MUX Control
+## 5. Manual fan control (examples)
 
-Some supported devices expose a **GPU MUX switch** via sysfs.
+```bash
+# Set a fixed fan speed (hex)
+fan_speed 0x32
 
-The MUX has **three modes**, starting from `0`:
+# Force maximum fan speed and stop the auto daemon
+fan_max 1
 
-| Value | Mode                 |
-| ----: | -------------------- |
-|   `0` | Hybrid (iGPU + dGPU) |
-|   `1` | Discrete GPU only    |
-|   `2` | optimus GPU mode  |
+# Hand control back to Omenfan
+fan_max 0
 
-* Set the MUX mode:
-
-  ```bash
-  echo 1 | sudo tee /sys/devices/platform/hp-wmi/mux > /dev/null
-  ```
+# Inspect the raw EC contents
+ec_read
+```
 
 ---
 
-## Additional Features
+## Supported hardware
 
-* **Keyboard Backlight Support**
-  Available for devices that support it.
-  Identifier: `[8BCD]`
-
-* **Performance Modes**
-  Performance profiles are exposed through **`platform-profiles`** and can be controlled using standard Linux tooling.
-
----
-
-## Notes
-
-This project ships with **helper binaries and systemd service/timer units**.
-They are intentionally **simple and easy to read**, allowing users to audit, modify, or extend them as needed.
-
----
-
-If you want to tighten this further (shorter README, more “man page” style, or add systemd unit examples inline), say the word.
+Built and tested against HP OMEN laptops whose DMI board name is **`8BCD`**
+(defined in `hpomen-1.0/hpomen.c` as `thermal_profile_v1_boards`).
