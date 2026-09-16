@@ -9,23 +9,21 @@ LOG_FILE = "/tmp/omenfan.log"
 
 
 def resolve_ec_path():
-    """Pick the EC I/O path.
-
-    If `ec_sys` is loaded we read the EC through the in-tree debugfs
-    interface at `/sys/kernel/debug/ec/ec0/io`.
-
-    Otherwise we fall back to the char device exposed by the out-of-tree
-    `acpi_ec` module at `/dev/ec`, `modprobe`-ing it as required.
-    """
-    try:
-        loaded = subprocess.check_output(["lsmod"], text=True)
-    except Exception:
-        loaded = ""
-    if "ec_sys" in loaded and os.path.exists("/sys/kernel/debug/ec/ec0/io"):
-        return "/sys/kernel/debug/ec/ec0/io"
+    
+    """Pick the EC I/O path."""
+    ec_path = "/sys/kernel/debug/ec/ec0/io"
+    if os.path.exists(ec_path):
+        return ec_path
     subprocess.run(["modprobe", "acpi_ec"], check=False)
     return "/dev/ec"
 
+def require_root():
+    """Exit unless the script is running as root."""
+    if os.geteuid() != 0:
+        print("Error: this script requires root privileges (run via sudo or as root).")
+        exit(1)
+
+require_root()
 
 ECIO_FILE = resolve_ec_path()
 
