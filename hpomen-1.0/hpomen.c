@@ -308,6 +308,34 @@ static struct rfkill *wifi_rfkill;
 static struct rfkill *bluetooth_rfkill;
 static struct rfkill *wwan_rfkill;
 
+static struct delayed_work hp_wmi_fan_refresh_work;
+static bool hp_wmi_fan_refresh_work_started;
+
+static int hp_wmi_get_fan_count(void);
+
+static void hp_wmi_fan_refresh_work_fn(struct work_struct *work)
+{
+	hp_wmi_get_fan_count();
+	if (hp_wmi_fan_refresh_work_started)
+		schedule_delayed_work(&hp_wmi_fan_refresh_work, msecs_to_jiffies(115000));
+}
+
+static void hp_wmi_fan_refresh_start(void)
+{
+	if (hp_wmi_fan_refresh_work_started)
+		return;
+
+	INIT_DELAYED_WORK(&hp_wmi_fan_refresh_work, hp_wmi_fan_refresh_work_fn);
+	schedule_delayed_work(&hp_wmi_fan_refresh_work, msecs_to_jiffies(115000));
+	hp_wmi_fan_refresh_work_started = true;
+}
+
+static void hp_wmi_fan_refresh_stop(void)
+{
+	hp_wmi_fan_refresh_work_started = false;
+	cancel_delayed_work_sync(&hp_wmi_fan_refresh_work);
+}
+
 struct rfkill2_device {
 	u8 id;
 	int num;
@@ -850,7 +878,26 @@ static ssize_t fancount_show(struct device *dev, struct device_attribute *attr,
 
 	if (ret < 0)
 		return ret;
-	return sysfs_emit(buf, "fancount : %d\n", ret);
+	return sysfs_emit(buf, "fancount : %d\nscheduler : %s\n", ret,
+			  hp_wmi_fan_refresh_work_started ? "started" : "stopped");
+}
+
+static ssize_t fancount_store(struct device *dev, struct device_attribute *attr,
+				const char *buf, size_t count)
+{
+	bool enable;
+	int ret;
+
+	ret = kstrtobool(buf, &enable);
+	if (ret)
+		return ret;
+
+	if (enable)
+		hp_wmi_fan_refresh_start();
+	else
+		hp_wmi_fan_refresh_stop();
+
+	return count;
 }
 
 static ssize_t fanspeed_show(struct device *dev, struct device_attribute *attr,
@@ -1073,7 +1120,7 @@ static DEVICE_ATTR_RO(dock);
 static DEVICE_ATTR_RO(tablet);
 static DEVICE_ATTR_RW(postcode);
 static DEVICE_ATTR_RW(backlight);
-static DEVICE_ATTR_RO(fancount);
+static DEVICE_ATTR_RW(fancount);
 static DEVICE_ATTR_RW(fanspeed);
 static DEVICE_ATTR_RO(systemdesign);
 static DEVICE_ATTR_RW(mux);
@@ -1753,12 +1800,17 @@ static int __init hp_wmi_bios_setup(struct platform_device *device)
 
 	thermal_profile_setup(device);
 
+	if (is_omen_v1_thermal_profile())
+		hp_wmi_fan_refresh_start();
+
 	return 0;
 }
 
 static void __exit hp_wmi_bios_remove(struct platform_device *device)
 {
 	int i;
+
+	hp_wmi_fan_refresh_stop();
 
 	for (i = 0; i < rfkill2_count; i++) {
 		rfkill_unregister(rfkill2[i].rfkill);
